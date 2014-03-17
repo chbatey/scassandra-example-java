@@ -1,0 +1,16 @@
+apply plugin: 'java'
+apply plugin: 'idea'
+repositories {
+  mavenCentral()
+}
+
+dependencies {
+  compile files('./lib/cql-messages-assembly-0.1.jar')
+  compile files('./lib/cassandra_server_stub.jar')
+  compile     'com.datastax.cassandra:cassandra-driver-core:2+'
+  testCompile 'org.mockito:mockito-all:1.9.5'
+  testCompile 'junit:junit:4.11'
+  testCompile 'org.powermock:powermock-mockito-release-full:1.5'
+  testCompile 'org.apache.httpcomponents:httpclient:4.3.3'
+}
+
