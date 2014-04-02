@@ -4,6 +4,7 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
+import com.datastax.driver.core.exceptions.ReadTimeoutException;
 
 import java.util.Collections;
 import java.util.List;
@@ -28,7 +29,12 @@ public class ExampleDao {
     }
 
     public List<String> retrieveNames() {
-        ResultSet result = session.execute("select * from people");
+        ResultSet result = null;
+        try {
+            result = session.execute("select * from people");
+        } catch (ReadTimeoutException e) {
+            throw new ExampleDaoException();
+        }
         return result.all().stream().map(row -> row.getString("name")).collect(Collectors.toList());
     }
 }

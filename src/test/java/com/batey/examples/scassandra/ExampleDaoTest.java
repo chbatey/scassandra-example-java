@@ -55,4 +55,19 @@ public class ExampleDaoTest {
         assertEquals(1, names.size());
         assertEquals(primedName, names.get(0));
     }
+
+
+    @Test(expected = ExampleDaoException.class)
+    public void testHandlingOfReadRequestTimeout() throws Exception{
+        // given
+        primingClient.prime(new PrimingRequest("select * from people", PrimingRequest.Result.read_request_timeout));
+        ExampleDao exampleDao = new ExampleDao(portNumber);
+
+        //when
+        exampleDao.connect();
+        exampleDao.retrieveNames();
+
+        //then
+
+    }
 }
