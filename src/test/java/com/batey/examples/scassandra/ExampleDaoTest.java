@@ -50,7 +50,7 @@ public class ExampleDaoTest {
         //when
         exampleDao.connect();
         List<String> names = exampleDao.retrieveNames();
-        
+
         //then
         assertEquals(1, names.size());
         assertEquals(primedName, names.get(0));
