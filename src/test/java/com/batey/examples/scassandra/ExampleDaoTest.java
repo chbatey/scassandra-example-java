@@ -4,10 +4,12 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.scassandra.Scassandra;
+import org.scassandra.ScassandraFactory;
 import org.scassandra.http.client.ActivityClient;
 import org.scassandra.http.client.PrimingClient;
 import org.scassandra.http.client.PrimingRequest;
-import uk.co.scassandra.ServerStubRunner;
+import org.scassandra.http.client.Query;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -20,32 +22,32 @@ public class ExampleDaoTest {
 
     private static int portNumber = 8042;
     private static int primingPortNumber = 8043;
-    private static final ServerStubRunner serverStub = new ServerStubRunner(portNumber, primingPortNumber);
 
-    private PrimingClient primingClient = new PrimingClient("localhost", primingPortNumber);
-    private ActivityClient activityClient = new ActivityClient("localhost", primingPortNumber);
+    private PrimingClient primingClient;
+    private ActivityClient activityClient;
 
     private ExampleDao underTest;
+    private static Scassandra scassandra;
 
     @BeforeClass
     public static void startScassandraServerStub() throws Exception {
-        new Thread() {
-            public void run() {
-                serverStub.start();
-            }
-        }.start();
-        Thread.sleep(3000);
-        System.out.println("Server stub started");
+        scassandra = ScassandraFactory.createServer(portNumber, primingPortNumber);
+        scassandra.start();
+        Thread.sleep(2000);
     }
 
     @AfterClass
     public static void shutdown() {
-        serverStub.shutdown();
+        scassandra.stop();
     }
 
     @Before
     public void setup() {
+        this.primingClient = new PrimingClient("localhost", primingPortNumber);
+        this.activityClient = new ActivityClient("localhost", primingPortNumber);
         this.underTest = new ExampleDao(portNumber);
+        this.activityClient.clearConnections();
+        this.activityClient.clearQueries();
     }
 
 
@@ -78,6 +80,16 @@ public class ExampleDaoTest {
 
         //then
     }
+    @Test
+    public void testDaoConnectsToCassandra() {
+        //given
+        activityClient.clearConnections();
+        //when
+        underTest.connect();
+        //then
+        assertTrue(activityClient.retrieveConnections().size() > 0);
+    }
+
 
     @Test
     public void testCorrectQueryIssuedOnConnect() {
@@ -85,7 +97,8 @@ public class ExampleDaoTest {
         //when
         underTest.connect();
         //then
-        assertTrue(activityClient.retrieveQueries().stream().anyMatch(
+        List<Query> queries = activityClient.retrieveQueries();
+        assertTrue(queries.stream().anyMatch(
                 query -> query.getQuery().equals("use people")
         ));
     }
