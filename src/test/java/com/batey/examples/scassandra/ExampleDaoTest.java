@@ -1,9 +1,6 @@
 package com.batey.examples.scassandra;
 
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.*;
 import org.scassandra.Scassandra;
 import org.scassandra.ScassandraFactory;
 import org.scassandra.http.client.ActivityClient;
@@ -50,6 +47,10 @@ public class ExampleDaoTest {
         this.activityClient.clearQueries();
     }
 
+    @After
+    public void after() {
+        this.underTest.disconnect();
+    }
 
     @Test
     public void testRetrievingOfNames() throws Exception{
@@ -100,6 +101,19 @@ public class ExampleDaoTest {
         List<Query> queries = activityClient.retrieveQueries();
         assertTrue(queries.stream().anyMatch(
                 query -> query.getQuery().equals("use people")
+        ));
+    }
+
+    @Test
+    public void testQueryIssuedWithCorrectConsistency() {
+        //given
+        underTest.connect();
+        //when
+        underTest.retrieveNames();
+        //then
+        List<Query> queries = activityClient.retrieveQueries();
+        assertTrue("Expected query with consistency TWO, found following queries: " + queries, queries.stream().anyMatch(
+                query -> query.getQuery().equals("select * from people") && query.getConsistency().equals("TWO")
         ));
     }
 

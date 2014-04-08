@@ -1,8 +1,6 @@
 package com.batey.examples.scassandra;
 
-import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.ResultSet;
-import com.datastax.driver.core.Session;
+import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.ReadTimeoutException;
 
 import java.util.List;
@@ -20,15 +18,21 @@ public class ExampleDao {
 
     public void connect() {
         // do something
-        cluster = Cluster.builder().addContactPoint("localhost").withPort(8042).build();
+        cluster = Cluster.builder().addContactPoint("localhost").withPort(port).build();
         session = cluster.connect("people");
 
     }
 
+    public void disconnect() {
+        cluster.close();
+    }
+
     public List<String> retrieveNames() {
-        ResultSet result = null;
+        ResultSet result;
         try {
-            result = session.execute("select * from people");
+            Statement statement = new SimpleStatement("select * from people");
+            statement.setConsistencyLevel(ConsistencyLevel.ONE);
+            result = session.execute(statement);
         } catch (ReadTimeoutException e) {
             throw new ExampleDaoException();
         }
