@@ -1,13 +1,14 @@
 apply plugin: 'java'
 apply plugin: 'idea'
 repositories {
+  mavenLocal()
   mavenCentral()
 }
 
 dependencies {
   compile files('./lib/cql-messages-assembly-0.1.jar')
   compile files('./lib/cassandra_server_stub.jar')
-  compile files('./lib/scassandra-java-client.jar')
+  compile     'org.scassandra:java-client:0.0-SNAPSHOT'
   compile     'com.datastax.cassandra:cassandra-driver-core:2+'
   testCompile 'org.mockito:mockito-all:1.9.5'
   testCompile 'junit:junit:4.11'
@@ -15,4 +16,10 @@ dependencies {
   testCompile 'org.apache.httpcomponents:httpclient:4.3.3'
   testCompile 'com.google.code.gson:gson:2.2.4'
 }
+
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '1.11'
+}
+
 

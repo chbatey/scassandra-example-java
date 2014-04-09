@@ -31,7 +31,7 @@ public class ExampleDao {
         ResultSet result;
         try {
             Statement statement = new SimpleStatement("select * from people");
-            statement.setConsistencyLevel(ConsistencyLevel.ONE);
+            statement.setConsistencyLevel(ConsistencyLevel.TWO);
             result = session.execute(statement);
         } catch (ReadTimeoutException e) {
             throw new ExampleDaoException();

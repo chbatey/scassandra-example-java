@@ -42,7 +42,9 @@ public class ExampleDaoTest {
     public void setup() {
         this.primingClient = new PrimingClient("localhost", primingPortNumber);
         this.activityClient = new ActivityClient("localhost", primingPortNumber);
+
         this.underTest = new ExampleDao(portNumber);
+
         this.activityClient.clearConnections();
         this.activityClient.clearQueries();
     }
@@ -71,7 +73,7 @@ public class ExampleDaoTest {
 
 
     @Test(expected = ExampleDaoException.class)
-    public void testHandlingOfReadRequestTimeout() throws Exception{
+    public void testHandlingOfReadRequestTimeout() throws Exception {
         // given
         primingClient.prime(new PrimingRequest("select * from people", PrimingRequest.Result.read_request_timeout));
 
