@@ -1,5 +1,6 @@
 package com.batey.examples.scassandra;
 
+import com.google.common.collect.ImmutableMap;
 import org.junit.*;
 import org.scassandra.Scassandra;
 import org.scassandra.ScassandraFactory;
@@ -57,10 +58,11 @@ public class ExampleDaoTest {
     @Test
     public void testRetrievingOfNames() throws Exception{
         // given
-        Map<String, String> row = new HashMap<>();
-        String primedName = "Chris";
-        row.put("name", primedName);
-        primingClient.prime(new PrimingRequest("select * from people", Arrays.asList(row)));
+        Map<String, String> row = ImmutableMap.of("name", "Chris");
+        PrimingRequest pr = PrimingRequest.builder()
+                .withQuery("select * from people")
+                .withRows(Arrays.asList(row)).build();
+        primingClient.prime(pr);
 
         //when
         underTest.connect();
@@ -68,14 +70,18 @@ public class ExampleDaoTest {
 
         //then
         assertEquals(1, names.size());
-        assertEquals(primedName, names.get(0));
+        assertEquals("Chris", names.get(0));
     }
 
 
     @Test(expected = ExampleDaoException.class)
     public void testHandlingOfReadRequestTimeout() throws Exception {
         // given
-        primingClient.prime(new PrimingRequest("select * from people", PrimingRequest.Result.read_request_timeout));
+        PrimingRequest pr = PrimingRequest.builder()
+                .withQuery("select * from people")
+                .withResult(PrimingRequest.Result.read_request_timeout)
+                .build();
+        primingClient.prime(pr);
 
         //when
         underTest.connect();
@@ -83,6 +89,7 @@ public class ExampleDaoTest {
 
         //then
     }
+
     @Test
     public void testDaoConnectsToCassandra() {
         //given
@@ -97,26 +104,25 @@ public class ExampleDaoTest {
     @Test
     public void testCorrectQueryIssuedOnConnect() {
         //given
+        Query expectedQuery = new Query("use people", "ONE");
         //when
         underTest.connect();
         //then
         List<Query> queries = activityClient.retrieveQueries();
-        assertTrue(queries.stream().anyMatch(
-                query -> query.getQuery().equals("use people")
-        ));
+        assertTrue(queries.contains(expectedQuery));
     }
 
     @Test
     public void testQueryIssuedWithCorrectConsistency() {
         //given
+        Query expectedQuery = new Query("select * from people", "TWO");
         underTest.connect();
         //when
         underTest.retrieveNames();
         //then
         List<Query> queries = activityClient.retrieveQueries();
-        assertTrue("Expected query with consistency TWO, found following queries: " + queries, queries.stream().anyMatch(
-                query -> query.getQuery().equals("select * from people") && query.getConsistency().equals("TWO")
-        ));
+        assertTrue("Expected query with consistency TWO, found following queries: " + queries,
+                queries.contains(expectedQuery));
     }
 
 }
