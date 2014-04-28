@@ -6,7 +6,6 @@ repositories {
 }
 
 dependencies {
-  compile files('./lib/cql-messages-assembly-0.1.jar')
   compile files('./lib/cassandra_server_stub.jar')
   compile     'org.scassandra:java-client:0.0-SNAPSHOT'
   compile     'com.datastax.cassandra:cassandra-driver-core:2+'
