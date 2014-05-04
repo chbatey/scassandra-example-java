@@ -58,7 +58,7 @@ public class ExampleDaoTest {
     @Test
     public void testRetrievingOfNames() throws Exception{
         // given
-        Map<String, String> row = ImmutableMap.of("name", "Chris");
+        Map<String, Object> row = ImmutableMap.of("name", (Object)"Chris");
         PrimingRequest pr = PrimingRequest.builder()
                 .withQuery("select * from people")
                 .withRows(Arrays.asList(row)).build();
