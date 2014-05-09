@@ -23,9 +23,9 @@ public class ExampleDaoTest {
 
     private PrimingClient primingClient;
     private ActivityClient activityClient;
+    private static Scassandra scassandra;
 
     private ExampleDao underTest;
-    private static Scassandra scassandra;
 
     @BeforeClass
     public static void startScassandraServerStub() throws Exception {
@@ -58,11 +58,11 @@ public class ExampleDaoTest {
     @Test
     public void testRetrievingOfNames() throws Exception{
         // given
-        Map<String, Object> row = ImmutableMap.of("name", (Object)"Chris");
-        PrimingRequest pr = PrimingRequest.builder()
+        Map<String, String> row = ImmutableMap.of("name", "Chris");
+        PrimingRequest pr = PrimingRequest.queryBuilder()
                 .withQuery("select * from people")
-                .withRows(Arrays.asList(row)).build();
-        primingClient.prime(pr);
+                .withRows(row).build();
+        primingClient.primeQuery(pr);
 
         //when
         underTest.connect();
@@ -77,11 +77,11 @@ public class ExampleDaoTest {
     @Test(expected = ExampleDaoException.class)
     public void testHandlingOfReadRequestTimeout() throws Exception {
         // given
-        PrimingRequest pr = PrimingRequest.builder()
+        PrimingRequest pr = PrimingRequest.queryBuilder()
                 .withQuery("select * from people")
                 .withResult(PrimingRequest.Result.read_request_timeout)
                 .build();
-        primingClient.prime(pr);
+        primingClient.primeQuery(pr);
 
         //when
         underTest.connect();
