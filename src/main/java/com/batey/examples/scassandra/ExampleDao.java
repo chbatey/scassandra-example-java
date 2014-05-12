@@ -3,8 +3,8 @@ package com.batey.examples.scassandra;
 import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.ReadTimeoutException;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class ExampleDao {
 
@@ -36,6 +36,11 @@ public class ExampleDao {
         } catch (ReadTimeoutException e) {
             throw new ExampleDaoException();
         }
-        return result.all().stream().map(row -> row.getString("name")).collect(Collectors.toList());
+
+        List<String> names = new ArrayList<>();
+        for (Row row : result) {
+            names.add(row.getString("name"));
+        }
+        return names;
     }
 }
