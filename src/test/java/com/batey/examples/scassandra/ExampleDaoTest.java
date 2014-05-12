@@ -41,8 +41,8 @@ public class ExampleDaoTest {
 
     @Before
     public void setup() {
-        this.primingClient = new PrimingClient("localhost", primingPortNumber);
-        this.activityClient = new ActivityClient("localhost", primingPortNumber);
+        this.primingClient = PrimingClient.builder().withHost("localhost").withPort(primingPortNumber).build();
+        this.activityClient = ActivityClient.builder().build(); // defaults to (localhost, 8043)
 
         this.underTest = new ExampleDao(portNumber);
 
@@ -104,7 +104,7 @@ public class ExampleDaoTest {
     @Test
     public void testCorrectQueryIssuedOnConnect() {
         //given
-        Query expectedQuery = new Query("use people", "ONE");
+        Query expectedQuery = Query.builder().withQuery("use people").withConsistency("ONE").build();
         //when
         underTest.connect();
         //then
@@ -115,7 +115,7 @@ public class ExampleDaoTest {
     @Test
     public void testQueryIssuedWithCorrectConsistency() {
         //given
-        Query expectedQuery = new Query("select * from people", "TWO");
+        Query expectedQuery = Query.builder().withQuery("select * from people").withConsistency("TWO").build();
         underTest.connect();
         //when
         underTest.retrieveNames();
