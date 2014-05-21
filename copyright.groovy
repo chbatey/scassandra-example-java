@@ -1,4 +1,4 @@
-/*
+def copyrightNotice = """/*
  * Copyright (C) 2014 Christopher Batey
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.batey.examples.scassandra;
+"""
 
-public class UnableToRetrievePeopleException extends RuntimeException {
-}
+    def srcDir = new File('src')
+    srcDir.eachFileRecurse { file ->
+        if (file.name.endsWith(".java") && !file.text.contains(copyrightNotice)) {
+            println "Adding copyright header to $file.path"
+            def newFileText = copyrightNotice + file.text;
+            file.text = newFileText;
+        }
+    }
