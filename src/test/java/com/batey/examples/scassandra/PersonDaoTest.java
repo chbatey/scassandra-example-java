@@ -9,29 +9,27 @@ import org.scassandra.http.client.PrimingClient;
 import org.scassandra.http.client.PrimingRequest;
 import org.scassandra.http.client.Query;
 
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.*;
 
-public class ExampleDaoTest {
+public class PersonDaoTest {
 
-    private static int portNumber = 8042;
-    private static int primingPortNumber = 8043;
+    public static final int DEFAULT_SCASSANDRA_BINARY_PORT = 8042;
+    private PersonDao underTest;
 
-    private PrimingClient primingClient;
-    private ActivityClient activityClient;
+    private static PrimingClient primingClient;
+    private static ActivityClient activityClient;
     private static Scassandra scassandra;
 
-    private ExampleDao underTest;
 
     @BeforeClass
-    public static void startScassandraServerStub() throws Exception {
-        scassandra = ScassandraFactory.createServer(portNumber, primingPortNumber);
+    public static void startScassandraServer() throws Exception {
+        scassandra = ScassandraFactory.createServer();
         scassandra.start();
-        Thread.sleep(2000);
+        primingClient = scassandra.primingClient();
+        activityClient = scassandra.activityClient();
     }
 
     @AfterClass
@@ -41,31 +39,27 @@ public class ExampleDaoTest {
 
     @Before
     public void setup() {
-        this.primingClient = PrimingClient.builder().withHost("localhost").withPort(primingPortNumber).build();
-        this.activityClient = ActivityClient.builder().build(); // defaults to (localhost, 8043)
-
-        this.underTest = new ExampleDao(portNumber);
-
-        this.activityClient.clearConnections();
-        this.activityClient.clearQueries();
+        underTest = new PersonDao(DEFAULT_SCASSANDRA_BINARY_PORT);
+        activityClient.clearAllRecordedActivity();
+        primingClient.clearAllPrimes();
     }
 
     @After
     public void after() {
-        this.underTest.disconnect();
+        underTest.disconnect();
     }
 
     @Test
     public void testRetrievingOfNames() throws Exception{
         // given
-        Map<String, String> row = ImmutableMap.of("name", "Chris");
+        Map<String, String> row = ImmutableMap.of("first_name", "Chris");
         PrimingRequest pr = PrimingRequest.queryBuilder()
-                .withQuery("select * from people")
+                .withQuery("select * from person")
                 .withRows(row).build();
         primingClient.primeQuery(pr);
+        underTest.connect();
 
         //when
-        underTest.connect();
         List<String> names = underTest.retrieveNames();
 
         //then
@@ -74,11 +68,11 @@ public class ExampleDaoTest {
     }
 
 
-    @Test(expected = ExampleDaoException.class)
+    @Test(expected = UnableToRetrievePeopleException.class)
     public void testHandlingOfReadRequestTimeout() throws Exception {
         // given
         PrimingRequest pr = PrimingRequest.queryBuilder()
-                .withQuery("select * from people")
+                .withQuery("select * from person")
                 .withResult(PrimingRequest.Result.read_request_timeout)
                 .build();
         primingClient.primeQuery(pr);
@@ -91,13 +85,14 @@ public class ExampleDaoTest {
     }
 
     @Test
-    public void testDaoConnectsToCassandra() {
+    public void shouldConnectToCassandraWhenConnectCalled() {
         //given
         activityClient.clearConnections();
         //when
         underTest.connect();
         //then
-        assertTrue(activityClient.retrieveConnections().size() > 0);
+        assertTrue("Expected at least one connection to Cassandra on connect",
+                activityClient.retrieveConnections().size() > 0);
     }
 
 
@@ -115,13 +110,15 @@ public class ExampleDaoTest {
     @Test
     public void testQueryIssuedWithCorrectConsistency() {
         //given
-        Query expectedQuery = Query.builder().withQuery("select * from people").withConsistency("TWO").build();
+        Query expectedQuery = Query.builder().withQuery("select * from person")
+                .withConsistency("QUORUM").build();
         underTest.connect();
+        activityClient.clearAllRecordedActivity();
         //when
         underTest.retrieveNames();
         //then
         List<Query> queries = activityClient.retrieveQueries();
-        assertTrue("Expected query with consistency TWO, found following queries: " + queries,
+        assertTrue("Expected query with consistency QUORUM, found following queries: " + queries,
                 queries.contains(expectedQuery));
     }
 
