@@ -26,6 +26,8 @@ public class PersonDao {
     private int port;
     private Cluster cluster;
     private Session session;
+    private PreparedStatement storeStatement;
+    private PreparedStatement retrieveStatement;
 
     public PersonDao(int port) {
         this.port = port;
@@ -34,13 +36,15 @@ public class PersonDao {
     public void connect() {
         cluster = Cluster.builder().addContactPoint("localhost").withPort(port).build();
         session = cluster.connect("people");
+        storeStatement = session.prepare("insert into person(first_name, age) values (?,?)");
+        retrieveStatement = session.prepare("select * from person where first_name = ?");
     }
 
     public void disconnect() {
         cluster.close();
     }
 
-    public List<String> retrieveNames() {
+    public List<Person> retrieveNames() {
         ResultSet result;
         try {
             Statement statement = new SimpleStatement("select * from person");
@@ -50,11 +54,27 @@ public class PersonDao {
             throw new UnableToRetrievePeopleException();
         }
 
-        List<String> names = new ArrayList<>();
+        List<Person> people = new ArrayList<>();
         for (Row row : result) {
-            names.add(row.getString("first_name"));
+            people.add(new Person(row.getString("first_name"), row.getInt("age")));
         }
-        return names;
+        return people;
+    }
+
+    public List<Person> retrievePeopleByName(String firstName) {
+        BoundStatement bind = retrieveStatement.bind(firstName);
+        ResultSet result = session.execute(bind);
+
+        List<Person> people = new ArrayList<>();
+        for (Row row : result) {
+            people.add(new Person(row.getString("first_name"), row.getInt("age")));
+        }
+        return people;
+    }
+
+    public void storePerson(Person person) {
+        BoundStatement bind = storeStatement.bind(person.getName(), person.getAge());
+        session.execute(bind);
     }
 
 }
