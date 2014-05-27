@@ -30,9 +30,7 @@ import static org.junit.Assert.assertEquals;
 
 public class PersonDaoTest {
 
-    public static final int DEFAULT_SCASSANDRA_BINARY_PORT = 8042;
     private PersonDao underTest;
-
     private static PrimingClient primingClient;
     private static ActivityClient activityClient;
     private static Scassandra scassandra;
@@ -53,7 +51,7 @@ public class PersonDaoTest {
 
     @Before
     public void setup() {
-        underTest = new PersonDao(DEFAULT_SCASSANDRA_BINARY_PORT);
+        underTest = new PersonDao(scassandra.getBinaryPort());
         activityClient.clearAllRecordedActivity();
         primingClient.clearAllPrimes();
     }
