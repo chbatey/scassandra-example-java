@@ -158,7 +158,7 @@ public class PersonDaoTest {
         assertEquals(1, executions.size());
         assertEquals("insert into person(first_name, age) values (?,?)", executions.get(0).getPreparedStatementText());
         assertEquals("ONE", executions.get(0).getConsistency(), "ONE");
-        assertEquals(Arrays.asList("Christopher", "29"), executions.get(0).getVariables());
+        assertEquals(Arrays.asList("Christopher", 29.0), executions.get(0).getVariables());
     }
 
     @Test
