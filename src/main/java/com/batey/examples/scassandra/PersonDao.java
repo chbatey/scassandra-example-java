@@ -29,7 +29,7 @@ public class PersonDao {
     private PreparedStatement storeStatement;
     private PreparedStatement retrieveStatement;
 
-    public PersonDao(int port) {
+    public PersonDao(int port, int retries) {
         this.port = port;
     }
 

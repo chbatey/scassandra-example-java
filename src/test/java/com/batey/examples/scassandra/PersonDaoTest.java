@@ -17,9 +17,8 @@ package com.batey.examples.scassandra;
 
 import com.google.common.collect.ImmutableMap;
 import org.junit.*;
-import org.scassandra.Scassandra;
-import org.scassandra.ScassandraFactory;
 import org.scassandra.http.client.*;
+import org.scassandra.junit.ScassandraServerRule;
 
 import java.util.Arrays;
 import java.util.List;
@@ -30,30 +29,21 @@ import static org.junit.Assert.assertEquals;
 
 public class PersonDaoTest {
 
+    @ClassRule
+    public static final ScassandraServerRule scassandra = new ScassandraServerRule();
+    public static final int CONFIGURED_RETRIES = 0;
+
+    @Rule
+    public final ScassandraServerRule resetScassandra = scassandra;
+
+    private static PrimingClient primingClient = scassandra.primingClient();
+    private static ActivityClient activityClient = scassandra.activityClient();
+
     private PersonDao underTest;
-    private static PrimingClient primingClient;
-    private static ActivityClient activityClient;
-    private static Scassandra scassandra;
-
-
-    @BeforeClass
-    public static void startScassandraServer() throws Exception {
-        scassandra = ScassandraFactory.createServer();
-        scassandra.start();
-        primingClient = scassandra.primingClient();
-        activityClient = scassandra.activityClient();
-    }
-
-    @AfterClass
-    public static void shutdown() {
-        scassandra.stop();
-    }
 
     @Before
     public void setup() {
-        underTest = new PersonDao(scassandra.getBinaryPort());
-        activityClient.clearAllRecordedActivity();
-        primingClient.clearAllPrimes();
+        underTest = new PersonDao(8042, CONFIGURED_RETRIES);
     }
 
     @After
@@ -130,10 +120,9 @@ public class PersonDaoTest {
     @Test
     public void testQueryIssuedWithCorrectConsistency() {
         //given
+        underTest.connect();
         Query expectedQuery = Query.builder().withQuery("select * from person")
                 .withConsistency("QUORUM").build();
-        underTest.connect();
-        activityClient.clearAllRecordedActivity();
         //when
         underTest.retrieveNames();
         //then
@@ -186,4 +175,8 @@ public class PersonDaoTest {
         assertEquals("Chris", names.get(0).getName());
     }
 
+    @Test
+    public void testRetries() throws Exception {
+        
+    }
 }
