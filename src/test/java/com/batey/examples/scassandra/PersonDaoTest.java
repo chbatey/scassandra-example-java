@@ -31,7 +31,7 @@ public class PersonDaoTest {
 
     @ClassRule
     public static final ScassandraServerRule scassandra = new ScassandraServerRule();
-    public static final int CONFIGURED_RETRIES = 0;
+    public static final int CONFIGURED_RETRIES = 3;
 
     @Rule
     public final ScassandraServerRule resetScassandra = scassandra;
@@ -176,7 +176,20 @@ public class PersonDaoTest {
     }
 
     @Test
-    public void testRetries() throws Exception {
-        
+    public void testRetriesConfiguredNumberOfTimes() throws Exception {
+        PrimingRequest readtimeoutPrime = PrimingRequest.preparedStatementBuilder()
+                .withQuery("select * from person")
+                .withResult(PrimingRequest.Result.read_request_timeout)
+                .build();
+        primingClient.primeQuery(readtimeoutPrime);
+        underTest.connect();
+        activityClient.clearAllRecordedActivity();
+
+        try {
+            underTest.retrieveNames();
+        } catch (UnableToRetrievePeopleException e) {
+        }
+
+        assertEquals(CONFIGURED_RETRIES + 1, activityClient.retrieveQueries().size());
     }
 }
