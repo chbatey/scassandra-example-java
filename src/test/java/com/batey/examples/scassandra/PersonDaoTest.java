@@ -192,4 +192,29 @@ public class PersonDaoTest {
 
         assertEquals(CONFIGURED_RETRIES + 1, activityClient.retrieveQueries().size());
     }
+
+    @Ignore("Can't do this until scassandra sends back the consistency that is sent in")
+    @Test
+    public void testLowersConsistency() throws Exception {
+        PrimingRequest readtimeoutPrime = PrimingRequest.preparedStatementBuilder()
+                .withQuery("select * from person")
+                .withResult(PrimingRequest.Result.read_request_timeout)
+                .build();
+        primingClient.primeQuery(readtimeoutPrime);
+        underTest.connect();
+        activityClient.clearAllRecordedActivity();
+
+        try {
+            underTest.retrieveNames();
+        } catch (UnableToRetrievePeopleException e) {
+        }
+
+        List<Query> queries = activityClient.retrieveQueries();
+        assertEquals(Query.builder()
+                .withQuery("select * from person")
+                .withConsistency("QUORUM").build(), queries.get(0));
+        assertEquals(Query.builder()
+                .withQuery("select * from person")
+                .withConsistency("THREE").build(), queries.get(1));
+    }
 }
