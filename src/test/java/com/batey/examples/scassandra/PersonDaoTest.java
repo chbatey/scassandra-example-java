@@ -18,14 +18,15 @@ package com.batey.examples.scassandra;
 import com.google.common.collect.ImmutableMap;
 import org.junit.*;
 import org.scassandra.http.client.*;
+import org.scassandra.http.client.PrimingRequest.Result;
 import org.scassandra.junit.ScassandraServerRule;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
+import static org.scassandra.matchers.Matchers.*;
 
 public class PersonDaoTest {
 
@@ -44,54 +45,13 @@ public class PersonDaoTest {
     @Before
     public void setup() {
         underTest = new PersonDao(8042, CONFIGURED_RETRIES);
+        underTest.connect();
+        activityClient.clearAllRecordedActivity();
     }
 
     @After
     public void after() {
         underTest.disconnect();
-    }
-
-    @Test
-    public void testRetrievingOfNames() throws Exception{
-        // given
-        Map<String, ? extends  Object> row = ImmutableMap.of(
-                "first_name", "Chris",
-                "last_name", "Batey",
-                "age", 29);
-        Map<String, ColumnTypes> columnTypes = ImmutableMap.of(
-                "age", ColumnTypes.Int
-        );
-        PrimingRequest singleRowPrime = PrimingRequest.queryBuilder()
-                .withQuery("select * from person")
-                .withColumnTypes(columnTypes)
-                .withRows(row)
-                .build();
-        primingClient.primeQuery(singleRowPrime);
-        underTest.connect();
-
-        //when
-        List<Person> names = underTest.retrieveNames();
-
-        //then
-        assertEquals(1, names.size());
-        assertEquals("Chris", names.get(0).getName());
-    }
-
-
-    @Test(expected = UnableToRetrievePeopleException.class)
-    public void testHandlingOfReadRequestTimeout() throws Exception {
-        // given
-        PrimingRequest primeReadRequestTimeout = PrimingRequest.queryBuilder()
-                .withQuery("select * from person")
-                .withResult(PrimingRequest.Result.read_request_timeout)
-                .build();
-        primingClient.primeQuery(primeReadRequestTimeout);
-
-        //when
-        underTest.connect();
-        underTest.retrieveNames();
-
-        //then
     }
 
     @Test
@@ -104,31 +64,98 @@ public class PersonDaoTest {
         assertTrue("Expected at least one connection to Cassandra on connect",
                 activityClient.retrieveConnections().size() > 0);
     }
+    
+    @Test
+    public void testRetrievingOfNames() throws Exception {
+        // given
+        Map<String, ?> row = ImmutableMap.of(
+                "first_name", "Chris",
+                "last_name", "Batey",
+                "age", 29);
+        Map<String, ColumnTypes> columnTypes = ImmutableMap.of(
+                "age", ColumnTypes.Int
+        );
+        PrimingRequest singleRowPrime = PrimingRequest.queryBuilder()
+                .withQuery("select * from person")
+                .withColumnTypes(columnTypes)
+                .withRows(row)
+                .build();
+        primingClient.prime(singleRowPrime);
 
+        //when
+        List<Person> names = underTest.retrieveNames();
+
+        //then
+        assertEquals(1, names.size());
+        assertEquals("Chris", names.get(0).getName());
+    }
+
+    @Test(expected = UnableToRetrievePeopleException.class)
+    public void testHandlingOfReadRequestTimeout() throws Exception {
+        // given
+        PrimingRequest primeReadRequestTimeout = PrimingRequest.queryBuilder()
+                .withQuery("select * from person")
+                .withResult(Result.read_request_timeout)
+                .build();
+        primingClient.prime(primeReadRequestTimeout);
+
+        //when
+        underTest.retrieveNames();
+
+        //then
+    }
 
     @Test
     public void testCorrectQueryIssuedOnConnect() {
         //given
-        Query expectedQuery = Query.builder().withQuery("use people").withConsistency("ONE").build();
+        Query expectedQuery = Query.builder().withQuery("USE people").withConsistency("ONE").build();
+
         //when
         underTest.connect();
+
         //then
         List<Query> queries = activityClient.retrieveQueries();
-        assertTrue(queries.contains(expectedQuery));
+        assertTrue("Expected query not executed, actual queries:  " + queries, queries.contains(expectedQuery));
+    }
+
+    @Test
+    public void testCorrectQueryIssuedOnConnectUsingMatcher() {
+        //given
+        Query expectedQuery = Query.builder().withQuery("USE people").withConsistency("ONE").build();
+
+        //when
+        underTest.connect();
+
+        //then
+        assertThat(activityClient.retrieveQueries(), containsQuery(expectedQuery));
     }
 
     @Test
     public void testQueryIssuedWithCorrectConsistency() {
         //given
-        underTest.connect();
-        Query expectedQuery = Query.builder().withQuery("select * from person")
-                .withConsistency("QUORUM").build();
+        Query expectedQuery = Query.builder().withQuery("select * from person").withConsistency("QUORUM").build();
+
         //when
         underTest.retrieveNames();
-        //then
+
+         //then
         List<Query> queries = activityClient.retrieveQueries();
         assertTrue("Expected query with consistency QUORUM, found following queries: " + queries,
                 queries.contains(expectedQuery));
+    }
+
+    @Test
+    public void testQueryIssuedWithCorrectConsistencyUsingMatcher() {
+        //given
+        Query expectedQuery = Query.builder()
+                .withQuery("select * from person")
+                .withConsistency("QUORUM").build();
+
+        //when
+        underTest.retrieveNames();
+
+        //then
+        assertThat(activityClient.retrieveQueries(), containsQuery(expectedQuery));
     }
 
     @Test
@@ -138,38 +165,40 @@ public class PersonDaoTest {
                 .withQuery("insert into person(first_name, age) values (?,?)")
                 .withVariableTypes(ColumnTypes.Varchar, ColumnTypes.Int)
                 .build();
-        primingClient.primePreparedStatement(preparedStatementPrime);
+        primingClient.prime(preparedStatementPrime);
         underTest.connect();
+
         //when
         underTest.storePerson(new Person("Christopher", 29));
+
         //then
-        List<PreparedStatementExecution> executions = activityClient.retrievePreparedStatementExecutions();
-        assertEquals(1, executions.size());
-        assertEquals("insert into person(first_name, age) values (?,?)", executions.get(0).getPreparedStatementText());
-        assertEquals("ONE", executions.get(0).getConsistency(), "ONE");
-        assertEquals(Arrays.asList("Christopher", 29.0), executions.get(0).getVariables());
+        PreparedStatementExecution expectedPreparedStatement = PreparedStatementExecution.builder()
+                .withPreparedStatementText("insert into person(first_name, age) values (?,?)")
+                .withConsistency("ONE")
+                .withVariables("Christopher", 29)
+                .build();
+        assertThat(activityClient.retrievePreparedStatementExecutions(), preparedStatementRecorded(expectedPreparedStatement));
     }
 
     @Test
     public void testRetrievePeopleViaPreparedStatement() {
         // given
-        Map<String, ? extends  Object> row = ImmutableMap.of(
+        Map<String, ?> row = ImmutableMap.of(
                 "first_name", "Chris",
                 "last_name", "Batey",
                 "age", 29);
-        Map<String, ColumnTypes> columnTypes = ImmutableMap.of(
-                "age", ColumnTypes.Int
-        );
+        Map<String, ColumnTypes> columnTypes = ImmutableMap.of("age", ColumnTypes.Int);
         PrimingRequest preparedStatementPrime = PrimingRequest.preparedStatementBuilder()
                 .withQuery("select * from person where first_name = ?")
-                .withVariableTypes(ColumnTypes.Varchar, ColumnTypes.Int)
+                .withVariableTypes(ColumnTypes.Varchar)
                 .withColumnTypes(columnTypes)
                 .withRows(row)
                 .build();
-        primingClient.primePreparedStatement(preparedStatementPrime);
-        underTest.connect();
+        primingClient.prime(preparedStatementPrime);
+
         //when
-        List<Person> names = underTest.retrievePeopleByName("Christopher");
+        List<Person> names = underTest.retrievePeopleByName("Chris");
+
         //then
         assertEquals(1, names.size());
         assertEquals("Chris", names.get(0).getName());
@@ -177,13 +206,11 @@ public class PersonDaoTest {
 
     @Test
     public void testRetriesConfiguredNumberOfTimes() throws Exception {
-        PrimingRequest readtimeoutPrime = PrimingRequest.preparedStatementBuilder()
+        PrimingRequest readTimeoutPrime = PrimingRequest.queryBuilder()
                 .withQuery("select * from person")
-                .withResult(PrimingRequest.Result.read_request_timeout)
+                .withResult(Result.read_request_timeout)
                 .build();
-        primingClient.primeQuery(readtimeoutPrime);
-        underTest.connect();
-        activityClient.clearAllRecordedActivity();
+        primingClient.prime(readTimeoutPrime);
 
         try {
             underTest.retrieveNames();
@@ -198,11 +225,9 @@ public class PersonDaoTest {
     public void testLowersConsistency() throws Exception {
         PrimingRequest readtimeoutPrime = PrimingRequest.preparedStatementBuilder()
                 .withQuery("select * from person")
-                .withResult(PrimingRequest.Result.read_request_timeout)
+                .withResult(Result.read_request_timeout)
                 .build();
-        primingClient.primeQuery(readtimeoutPrime);
-        underTest.connect();
-        activityClient.clearAllRecordedActivity();
+        primingClient.prime(readtimeoutPrime);
 
         try {
             underTest.retrieveNames();

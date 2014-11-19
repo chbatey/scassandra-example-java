@@ -10,6 +10,9 @@ idea {
 
 repositories {
     mavenLocal()
+    maven {
+        url "https://oss.sonatype.org/content/repositories/snapshots"
+    }
     mavenCentral()
 }
 
@@ -20,10 +23,9 @@ configurations.all {
 
 dependencies {
     compile 'com.datastax.cassandra:cassandra-driver-core:2+'
-    testCompile 'org.scassandra:java-client:0.2.1'
-    testCompile 'org.mockito:mockito-all:1.9.5'
+    testCompile 'org.scassandra:java-client:0.4.0-SNAPSHOT'
+    testCompile 'org.mockito:mockito-core:1.9.5'
     testCompile 'junit:junit:4.11'
-    testCompile 'org.powermock:powermock-mockito-release-full:1.5'
     testCompile 'com.google.code.gson:gson:2.2.4'
 }
 
