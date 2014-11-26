@@ -1,12 +1,25 @@
 apply plugin: 'java'
-apply plugin: 'idea'
+apply plugin: 'spring-boot'
 
-idea {
-    module {
-        downloadJavadoc = true
-        downloadSources = true
+sourceCompatibility = 1.8
+
+jar {
+    baseName = 'scassandra-example'
+    version = '0.0.1-SNAPSHOT'
+}
+
+buildscript {
+    ext {
+        springBootVersion = '1.1.9.RELEASE'
+    }
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
     }
 }
+
 
 repositories {
     mavenLocal()
@@ -23,6 +36,9 @@ configurations.all {
 
 dependencies {
     compile 'com.datastax.cassandra:cassandra-driver-core:2+'
+    compile("org.springframework.boot:spring-boot-starter-web")
+    compile("org.springframework.boot:spring-boot-starter-actuator")
+
     testCompile 'org.scassandra:java-client:0.4.0-SNAPSHOT'
     testCompile 'org.mockito:mockito-core:1.9.5'
     testCompile 'junit:junit:4.11'
@@ -30,7 +46,7 @@ dependencies {
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '1.11'
+    gradleVersion = '2.2.1'
 }
 
 

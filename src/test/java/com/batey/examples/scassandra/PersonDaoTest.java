@@ -31,20 +31,20 @@ import static org.scassandra.matchers.Matchers.*;
 public class PersonDaoTest {
 
     @ClassRule
-    public static final ScassandraServerRule scassandra = new ScassandraServerRule();
+    public static final ScassandraServerRule SCASSANDRA = new ScassandraServerRule();
     public static final int CONFIGURED_RETRIES = 3;
 
     @Rule
-    public final ScassandraServerRule resetScassandra = scassandra;
+    public final ScassandraServerRule resetScassandra = SCASSANDRA;
 
-    private static PrimingClient primingClient = scassandra.primingClient();
-    private static ActivityClient activityClient = scassandra.activityClient();
+    private static final PrimingClient primingClient = SCASSANDRA.primingClient();
+    private static final ActivityClient activityClient = SCASSANDRA.activityClient();
 
-    private PersonDao underTest;
+    private PersonDaoCassandra underTest;
 
     @Before
     public void setup() {
-        underTest = new PersonDao(8042, CONFIGURED_RETRIES);
+        underTest = new PersonDaoCassandra(8042, CONFIGURED_RETRIES);
         underTest.connect();
         activityClient.clearAllRecordedActivity();
     }
@@ -64,7 +64,7 @@ public class PersonDaoTest {
         assertTrue("Expected at least one connection to Cassandra on connect",
                 activityClient.retrieveConnections().size() > 0);
     }
-    
+
     @Test
     public void testRetrievingOfNames() throws Exception {
         // given
@@ -75,15 +75,14 @@ public class PersonDaoTest {
         Map<String, ColumnTypes> columnTypes = ImmutableMap.of(
                 "age", ColumnTypes.Int
         );
-        PrimingRequest singleRowPrime = PrimingRequest.queryBuilder()
+        primingClient.prime(PrimingRequest.queryBuilder()
                 .withQuery("select * from person")
                 .withColumnTypes(columnTypes)
                 .withRows(row)
-                .build();
-        primingClient.prime(singleRowPrime);
+                .build());
 
         //when
-        List<Person> names = underTest.retrieveNames();
+        List<Person> names = underTest.retrievePeople();
 
         //then
         assertEquals(1, names.size());
@@ -100,7 +99,7 @@ public class PersonDaoTest {
         primingClient.prime(primeReadRequestTimeout);
 
         //when
-        underTest.retrieveNames();
+        underTest.retrievePeople();
 
         //then
     }
@@ -136,7 +135,7 @@ public class PersonDaoTest {
         Query expectedQuery = Query.builder().withQuery("select * from person").withConsistency("QUORUM").build();
 
         //when
-        underTest.retrieveNames();
+        underTest.retrievePeople();
 
          //then
         List<Query> queries = activityClient.retrieveQueries();
@@ -152,7 +151,7 @@ public class PersonDaoTest {
                 .withConsistency("QUORUM").build();
 
         //when
-        underTest.retrieveNames();
+        underTest.retrievePeople();
 
         //then
         assertThat(activityClient.retrieveQueries(), containsQuery(expectedQuery));
@@ -213,11 +212,25 @@ public class PersonDaoTest {
         primingClient.prime(readTimeoutPrime);
 
         try {
-            underTest.retrieveNames();
+            underTest.retrievePeople();
         } catch (UnableToRetrievePeopleException e) {
         }
 
         assertEquals(CONFIGURED_RETRIES + 1, activityClient.retrieveQueries().size());
+    }
+
+    @Test(expected = UnableToSavePersonException.class)
+    public void testThatSlowQueriesTimeout() throws Exception {
+        // given
+        PrimingRequest preparedStatementPrime = PrimingRequest.preparedStatementBuilder()
+                .withQuery("insert into person(first_name, age) values (?,?)")
+                .withVariableTypes(ColumnTypes.Varchar, ColumnTypes.Int)
+                .withFixedDelay(1000)
+                .build();
+        primingClient.prime(preparedStatementPrime);
+        underTest.connect();
+
+        underTest.storePerson(new Person("Christopher", 29));
     }
 
     @Ignore("Can't do this until scassandra sends back the consistency that is sent in")
@@ -230,7 +243,7 @@ public class PersonDaoTest {
         primingClient.prime(readtimeoutPrime);
 
         try {
-            underTest.retrieveNames();
+            underTest.retrievePeople();
         } catch (UnableToRetrievePeopleException e) {
         }
 
