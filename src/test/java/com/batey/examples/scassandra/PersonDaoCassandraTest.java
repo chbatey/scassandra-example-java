@@ -35,7 +35,7 @@ public class PersonDaoCassandraTest {
     @Rule
     public final ScassandraServerRule resetScassandra = SCASSANDRA;
 
-    public static final int CONFIGURED_RETRIES = 3;
+    public static final int CONFIGURED_RETRIES = 1;
 
     private static final PrimingClient primingClient = SCASSANDRA.primingClient();
     private static final ActivityClient activityClient = SCASSANDRA.activityClient();
@@ -235,10 +235,9 @@ public class PersonDaoCassandraTest {
         underTest.storePerson(new Person("Christopher", 29, Collections.emptyList()));
     }
 
-    @Ignore("Can't do this until scassandra sends back the consistency that is sent in")
     @Test
     public void testLowersConsistency() throws Exception {
-        PrimingRequest readtimeoutPrime = PrimingRequest.preparedStatementBuilder()
+        PrimingRequest readtimeoutPrime = PrimingRequest.queryBuilder()
                 .withQuery("select * from person")
                 .withResult(Result.read_request_timeout)
                 .build();
@@ -250,11 +249,12 @@ public class PersonDaoCassandraTest {
         }
 
         List<Query> queries = activityClient.retrieveQueries();
+        assertEquals("Expected 2 attempts. Queries were: " + queries, 2, queries.size());
         assertEquals(Query.builder()
                 .withQuery("select * from person")
                 .withConsistency("QUORUM").build(), queries.get(0));
         assertEquals(Query.builder()
                 .withQuery("select * from person")
-                .withConsistency("THREE").build(), queries.get(1));
+                .withConsistency("ONE").build(), queries.get(1));
     }
 }

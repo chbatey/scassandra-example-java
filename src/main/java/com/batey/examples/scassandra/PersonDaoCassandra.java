@@ -4,6 +4,8 @@ import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.ReadTimeoutException;
 import com.datastax.driver.core.policies.DefaultRetryPolicy;
+import com.datastax.driver.core.policies.DowngradingConsistencyRetryPolicy;
+import com.datastax.driver.core.policies.LoggingRetryPolicy;
 import com.datastax.driver.core.policies.RetryPolicy;
 
 import java.util.ArrayList;
@@ -32,7 +34,7 @@ public class PersonDaoCassandra implements PersonDao {
         cluster = Cluster.builder()
                 .addContactPoint("localhost")
                 .withPort(port)
-                .withRetryPolicy(new RetryReads())
+                .withRetryPolicy(new LoggingRetryPolicy(new RetryReads()))
                 .withSocketOptions(socketOptions)
                 .build();
         session = cluster.connect("people");
@@ -89,7 +91,7 @@ public class PersonDaoCassandra implements PersonDao {
         @Override
         public RetryDecision onReadTimeout(Statement statement, ConsistencyLevel cl, int requiredResponses, int receivedResponses, boolean dataRetrieved, int nbRetry) {
             if (nbRetry < retries) {
-                return RetryDecision.retry(cl);
+                return RetryDecision.retry(ConsistencyLevel.ONE);
             } else {
                 return RetryDecision.rethrow();
             }
