@@ -7,6 +7,7 @@ import com.datastax.driver.core.policies.DefaultRetryPolicy;
 import com.datastax.driver.core.policies.RetryPolicy;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,7 +36,7 @@ public class PersonDaoCassandra implements PersonDao {
                 .withSocketOptions(socketOptions)
                 .build();
         session = cluster.connect("people");
-        storeStatement = session.prepare("insert into person(first_name, age) values (?,?)");
+        storeStatement = session.prepare("insert into person(first_name, age, interesting_dates) values (?,?,?)");
         retrieveStatement = session.prepare("select * from person where first_name = ?");
     }
 
@@ -56,7 +57,7 @@ public class PersonDaoCassandra implements PersonDao {
         }
 
         List<Person> people = result.all().stream().map(
-                row -> new Person(row.getString("first_name"), row.getInt("age"))
+                row -> new Person(row.getString("first_name"), row.getInt("age"), Collections.emptyList())
         ).collect(Collectors.toList());
 
         return people;
@@ -69,7 +70,7 @@ public class PersonDaoCassandra implements PersonDao {
 
         List<Person> people = new ArrayList<>();
         for (Row row : result) {
-            people.add(new Person(row.getString("first_name"), row.getInt("age")));
+            people.add(new Person(row.getString("first_name"), row.getInt("age"), Collections.emptyList()));
         }
         return people;
     }
@@ -77,7 +78,7 @@ public class PersonDaoCassandra implements PersonDao {
     @Override
     public void storePerson(Person person) {
         try {
-            BoundStatement bind = storeStatement.bind(person.getName(), person.getAge());
+            BoundStatement bind = storeStatement.bind(person.getName(), person.getAge(), person.getInterestingDates());
             session.execute(bind);
         } catch (NoHostAvailableException e) {
             throw new UnableToSavePersonException();

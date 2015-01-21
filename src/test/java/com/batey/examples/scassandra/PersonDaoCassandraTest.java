@@ -21,21 +21,21 @@ import org.scassandra.http.client.*;
 import org.scassandra.http.client.PrimingRequest.Result;
 import org.scassandra.junit.ScassandraServerRule;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 import static org.scassandra.matchers.Matchers.*;
 
-public class PersonDaoTest {
+public class PersonDaoCassandraTest {
 
     @ClassRule
     public static final ScassandraServerRule SCASSANDRA = new ScassandraServerRule();
-    public static final int CONFIGURED_RETRIES = 3;
 
     @Rule
     public final ScassandraServerRule resetScassandra = SCASSANDRA;
+
+    public static final int CONFIGURED_RETRIES = 3;
 
     private static final PrimingClient primingClient = SCASSANDRA.primingClient();
     private static final ActivityClient activityClient = SCASSANDRA.activityClient();
@@ -161,20 +161,22 @@ public class PersonDaoTest {
     public void testStorePerson() {
         // given
         PrimingRequest preparedStatementPrime = PrimingRequest.preparedStatementBuilder()
-                .withQuery("insert into person(first_name, age) values (?,?)")
-                .withVariableTypes(ColumnTypes.Varchar, ColumnTypes.Int)
+                .withQueryPattern(".*person.*")
+                .withVariableTypes(ColumnTypes.Varchar, ColumnTypes.Int, ColumnTypes.TimestampList)
                 .build();
         primingClient.prime(preparedStatementPrime);
         underTest.connect();
+        Date interestingDate = new Date();
+        List<Date> interestingDates = Arrays.asList(interestingDate);
 
         //when
-        underTest.storePerson(new Person("Christopher", 29));
+        underTest.storePerson(new Person("Christopher", 29, interestingDates));
 
         //then
         PreparedStatementExecution expectedPreparedStatement = PreparedStatementExecution.builder()
-                .withPreparedStatementText("insert into person(first_name, age) values (?,?)")
+                .withPreparedStatementText("insert into person(first_name, age, interesting_dates) values (?,?,?)")
                 .withConsistency("ONE")
-                .withVariables("Christopher", 29)
+                .withVariables("Christopher", 29, Arrays.asList(interestingDate))
                 .build();
         assertThat(activityClient.retrievePreparedStatementExecutions(), preparedStatementRecorded(expectedPreparedStatement));
     }
@@ -223,14 +225,14 @@ public class PersonDaoTest {
     public void testThatSlowQueriesTimeout() throws Exception {
         // given
         PrimingRequest preparedStatementPrime = PrimingRequest.preparedStatementBuilder()
-                .withQuery("insert into person(first_name, age) values (?,?)")
-                .withVariableTypes(ColumnTypes.Varchar, ColumnTypes.Int)
+                .withQueryPattern("insert into person.*")
+                .withVariableTypes(ColumnTypes.Varchar, ColumnTypes.Int, ColumnTypes.TimestampList)
                 .withFixedDelay(1000)
                 .build();
         primingClient.prime(preparedStatementPrime);
         underTest.connect();
 
-        underTest.storePerson(new Person("Christopher", 29));
+        underTest.storePerson(new Person("Christopher", 29, Collections.emptyList()));
     }
 
     @Ignore("Can't do this until scassandra sends back the consistency that is sent in")
