@@ -10,6 +10,7 @@ import com.datastax.driver.core.policies.RetryPolicy;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -38,8 +39,8 @@ public class PersonDaoCassandra implements PersonDao {
                 .withSocketOptions(socketOptions)
                 .build();
         session = cluster.connect("people");
-        storeStatement = session.prepare("insert into person(first_name, age, interesting_dates) values (?,?,?)");
-        retrieveStatement = session.prepare("select * from person where first_name = ?");
+        storeStatement = session.prepare("insert into person(name, age, interesting_dates) values (?,?,?)");
+        retrieveStatement = session.prepare("select * from person where name = ?");
     }
 
     @Override
@@ -72,7 +73,7 @@ public class PersonDaoCassandra implements PersonDao {
 
         List<Person> people = new ArrayList<>();
         for (Row row : result) {
-            people.add(new Person(row.getString("first_name"), row.getInt("age"), Collections.emptyList()));
+            people.add(new Person(row.getString("name"), row.getInt("age"), row.getList("interesting_dates", Date.class)));
         }
         return people;
     }

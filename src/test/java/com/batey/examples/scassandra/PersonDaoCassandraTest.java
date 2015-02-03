@@ -16,9 +16,12 @@
 package com.batey.examples.scassandra;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import org.junit.*;
+import org.scassandra.cql.PrimitiveType;
 import org.scassandra.http.client.*;
 import org.scassandra.http.client.PrimingRequest.Result;
+import org.scassandra.http.client.types.ColumnMetadata;
 import org.scassandra.junit.ScassandraServerRule;
 
 import java.util.*;
@@ -26,6 +29,11 @@ import java.util.*;
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 import static org.scassandra.matchers.Matchers.*;
+import static org.scassandra.http.client.types.ColumnMetadata.*;
+import static org.scassandra.cql.PrimitiveType.*;
+import static org.scassandra.cql.MapType.*;
+import static org.scassandra.cql.SetType.*;
+import static org.scassandra.cql.ListType.*;
 
 public class PersonDaoCassandraTest {
 
@@ -72,12 +80,9 @@ public class PersonDaoCassandraTest {
                 "first_name", "Chris",
                 "last_name", "Batey",
                 "age", 29);
-        Map<String, ColumnTypes> columnTypes = ImmutableMap.of(
-                "age", ColumnTypes.Int
-        );
         primingClient.prime(PrimingRequest.queryBuilder()
                 .withQuery("select * from person")
-                .withColumnTypes(columnTypes)
+                .withColumnTypes(column("age", PrimitiveType.INT))
                 .withRows(row)
                 .build());
 
@@ -162,7 +167,7 @@ public class PersonDaoCassandraTest {
         // given
         PrimingRequest preparedStatementPrime = PrimingRequest.preparedStatementBuilder()
                 .withQueryPattern(".*person.*")
-                .withVariableTypes(ColumnTypes.Varchar, ColumnTypes.Int, ColumnTypes.TimestampList)
+                .withVariableTypes(VARCHAR, INT, list(TIMESTAMP))
                 .build();
         primingClient.prime(preparedStatementPrime);
         underTest.connect();
@@ -174,7 +179,7 @@ public class PersonDaoCassandraTest {
 
         //then
         PreparedStatementExecution expectedPreparedStatement = PreparedStatementExecution.builder()
-                .withPreparedStatementText("insert into person(first_name, age, interesting_dates) values (?,?,?)")
+                .withPreparedStatementText("insert into person(name, age, interesting_dates) values (?,?,?)")
                 .withConsistency("ONE")
                 .withVariables("Christopher", 29, Arrays.asList(interestingDate))
                 .build();
@@ -184,25 +189,28 @@ public class PersonDaoCassandraTest {
     @Test
     public void testRetrievePeopleViaPreparedStatement() {
         // given
+        Date today = new Date();
         Map<String, ?> row = ImmutableMap.of(
-                "first_name", "Chris",
-                "last_name", "Batey",
-                "age", 29);
-        Map<String, ColumnTypes> columnTypes = ImmutableMap.of("age", ColumnTypes.Int);
+                "name", "Chris Batey",
+                "age", 29,
+                "interesting_dates", Lists.newArrayList(today.getTime())
+                );
         PrimingRequest preparedStatementPrime = PrimingRequest.preparedStatementBuilder()
-                .withQuery("select * from person where first_name = ?")
-                .withVariableTypes(ColumnTypes.Varchar)
-                .withColumnTypes(columnTypes)
+                .withQuery("select * from person where name = ?")
+                .withVariableTypes(VARCHAR)
+                .withColumnTypes(column("age", INT), column("interesting_dates", list(TIMESTAMP)))
                 .withRows(row)
                 .build();
         primingClient.prime(preparedStatementPrime);
 
         //when
-        List<Person> names = underTest.retrievePeopleByName("Chris");
+        List<Person> names = underTest.retrievePeopleByName("Chris Batey");
 
         //then
         assertEquals(1, names.size());
-        assertEquals("Chris", names.get(0).getName());
+        assertEquals("Chris Batey", names.get(0).getName());
+        assertEquals(29, names.get(0).getAge());
+        assertEquals(Lists.newArrayList(today), names.get(0).getInterestingDates());
     }
 
     @Test
