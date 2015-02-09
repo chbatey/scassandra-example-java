@@ -28,6 +28,9 @@ import java.util.*;
 
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
+import static org.scassandra.cql.ListType.list;
+import static org.scassandra.cql.PrimitiveType.*;
+import static org.scassandra.http.client.types.ColumnMetadata.column;
 import static org.scassandra.matchers.Matchers.*;
 import static org.scassandra.http.client.types.ColumnMetadata.*;
 import static org.scassandra.cql.PrimitiveType.*;
@@ -234,7 +237,7 @@ public class PersonDaoCassandraTest {
         // given
         PrimingRequest preparedStatementPrime = PrimingRequest.preparedStatementBuilder()
                 .withQueryPattern("insert into person.*")
-                .withVariableTypes(ColumnTypes.Varchar, ColumnTypes.Int, ColumnTypes.TimestampList)
+                .withVariableTypes(VARCHAR, INT, list(TIMESTAMP))
                 .withFixedDelay(1000)
                 .build();
         primingClient.prime(preparedStatementPrime);
