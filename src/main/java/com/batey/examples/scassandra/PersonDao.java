@@ -9,7 +9,7 @@ public interface PersonDao {
 
     List<Person> retrievePeople();
 
-    List<Person> retrievePeopleByName(String firstName);
+    List<Person> retrievePeopleByName(String firstName, String lastName);
 
     void storePerson(Person person);
 }

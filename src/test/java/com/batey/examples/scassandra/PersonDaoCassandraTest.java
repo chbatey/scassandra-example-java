@@ -16,27 +16,22 @@
 package com.batey.examples.scassandra;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import org.junit.*;
 import org.scassandra.cql.PrimitiveType;
 import org.scassandra.http.client.*;
-import org.scassandra.http.client.PrimingRequest.Result;
-import org.scassandra.http.client.types.ColumnMetadata;
 import org.scassandra.junit.ScassandraServerRule;
 
 import java.util.*;
 
 import static org.junit.Assert.*;
-import static org.junit.Assert.assertEquals;
-import static org.scassandra.cql.ListType.list;
 import static org.scassandra.cql.PrimitiveType.*;
+import static org.scassandra.cql.SetType.set;
+import static org.scassandra.http.client.PrimingRequest.Result.read_request_timeout;
+import static org.scassandra.http.client.PrimingRequest.then;
 import static org.scassandra.http.client.types.ColumnMetadata.column;
-import static org.scassandra.matchers.Matchers.*;
-import static org.scassandra.http.client.types.ColumnMetadata.*;
-import static org.scassandra.cql.PrimitiveType.*;
-import static org.scassandra.cql.MapType.*;
-import static org.scassandra.cql.SetType.*;
-import static org.scassandra.cql.ListType.*;
+import static org.scassandra.matchers.Matchers.containsQuery;
+import static org.scassandra.matchers.Matchers.preparedStatementRecorded;
 
 public class PersonDaoCassandraTest {
 
@@ -85,8 +80,9 @@ public class PersonDaoCassandraTest {
                 "age", 29);
         primingClient.prime(PrimingRequest.queryBuilder()
                 .withQuery("select * from person")
-                .withColumnTypes(column("age", PrimitiveType.INT))
-                .withRows(row)
+                .withThen(then()
+                    .withColumnTypes(column("age", PrimitiveType.INT), column("interesting_dates", set(TIMESTAMP)))
+                    .withRows(row))
                 .build());
 
         //when
@@ -94,7 +90,7 @@ public class PersonDaoCassandraTest {
 
         //then
         assertEquals(1, names.size());
-        assertEquals("Chris", names.get(0).getName());
+        assertEquals("Chris", names.get(0).getFirstName());
     }
 
     @Test(expected = UnableToRetrievePeopleException.class)
@@ -102,7 +98,7 @@ public class PersonDaoCassandraTest {
         // given
         PrimingRequest primeReadRequestTimeout = PrimingRequest.queryBuilder()
                 .withQuery("select * from person")
-                .withResult(Result.read_request_timeout)
+                .withThen(then().withResult(read_request_timeout))
                 .build();
         primingClient.prime(primeReadRequestTimeout);
 
@@ -115,7 +111,7 @@ public class PersonDaoCassandraTest {
     @Test
     public void testCorrectQueryIssuedOnConnect() {
         //given
-        Query expectedQuery = Query.builder().withQuery("USE people").withConsistency("ONE").build();
+        Query expectedQuery = Query.builder().withQuery("USE scassandra").withConsistency("ONE").build();
 
         //when
         underTest.connect();
@@ -128,7 +124,7 @@ public class PersonDaoCassandraTest {
     @Test
     public void testCorrectQueryIssuedOnConnectUsingMatcher() {
         //given
-        Query expectedQuery = Query.builder().withQuery("USE people").withConsistency("ONE").build();
+        Query expectedQuery = Query.builder().withQuery("USE scassandra").withConsistency("ONE").build();
 
         //when
         underTest.connect();
@@ -170,21 +166,21 @@ public class PersonDaoCassandraTest {
         // given
         PrimingRequest preparedStatementPrime = PrimingRequest.preparedStatementBuilder()
                 .withQueryPattern(".*person.*")
-                .withVariableTypes(VARCHAR, INT, list(TIMESTAMP))
+                .withThen(then().withVariableTypes(VARCHAR, VARCHAR, INT, set(TIMESTAMP)))
                 .build();
         primingClient.prime(preparedStatementPrime);
         underTest.connect();
         Date interestingDate = new Date();
-        List<Date> interestingDates = Arrays.asList(interestingDate);
+        Set<Date> interestingDates = Sets.newHashSet(interestingDate);
 
         //when
-        underTest.storePerson(new Person("Christopher", 29, interestingDates));
+        underTest.storePerson(new Person("Christopher", "Batey", 29, interestingDates));
 
         //then
         PreparedStatementExecution expectedPreparedStatement = PreparedStatementExecution.builder()
-                .withPreparedStatementText("insert into person(name, age, interesting_dates) values (?,?,?)")
+                .withPreparedStatementText("insert into person(first_name, last_name, age, interesting_dates) values (?,?,?,?)")
                 .withConsistency("ONE")
-                .withVariables("Christopher", 29, Arrays.asList(interestingDate))
+                .withVariables("Christopher", "Batey", 29, Sets.newHashSet(interestingDate))
                 .build();
         assertThat(activityClient.retrievePreparedStatementExecutions(), preparedStatementRecorded(expectedPreparedStatement));
     }
@@ -194,33 +190,34 @@ public class PersonDaoCassandraTest {
         // given
         Date today = new Date();
         Map<String, ?> row = ImmutableMap.of(
-                "name", "Chris Batey",
+                "first_name", "Chris",
+                "last_name", "Batey",
                 "age", 29,
-                "interesting_dates", Lists.newArrayList(today.getTime())
+                "interesting_dates", Sets.newHashSet(today.getTime())
                 );
         PrimingRequest preparedStatementPrime = PrimingRequest.preparedStatementBuilder()
-                .withQuery("select * from person where name = ?")
-                .withVariableTypes(VARCHAR)
-                .withColumnTypes(column("age", INT), column("interesting_dates", list(TIMESTAMP)))
-                .withRows(row)
-                .build();
+                .withQuery("select * from person where first_name = ? and last_name = ?")
+                .withThen(then().withVariableTypes(VARCHAR, VARCHAR)
+                .withColumnTypes(column("age", INT), column("interesting_dates", set(TIMESTAMP)))
+                .withRows(row)).build();
         primingClient.prime(preparedStatementPrime);
 
         //when
-        List<Person> names = underTest.retrievePeopleByName("Chris Batey");
+        List<Person> names = underTest.retrievePeopleByName("Chris", "Batey");
 
         //then
         assertEquals(1, names.size());
-        assertEquals("Chris Batey", names.get(0).getName());
+        assertEquals("Chris", names.get(0).getFirstName());
+        assertEquals("Batey", names.get(0).getLastName());
         assertEquals(29, names.get(0).getAge());
-        assertEquals(Lists.newArrayList(today), names.get(0).getInterestingDates());
+        assertEquals(Sets.newHashSet(today), names.get(0).getInterestingDates());
     }
 
     @Test
     public void testRetriesConfiguredNumberOfTimes() throws Exception {
         PrimingRequest readTimeoutPrime = PrimingRequest.queryBuilder()
                 .withQuery("select * from person")
-                .withResult(Result.read_request_timeout)
+                .withThen(then().withResult(read_request_timeout))
                 .build();
         primingClient.prime(readTimeoutPrime);
 
@@ -237,20 +234,21 @@ public class PersonDaoCassandraTest {
         // given
         PrimingRequest preparedStatementPrime = PrimingRequest.preparedStatementBuilder()
                 .withQueryPattern("insert into person.*")
-                .withVariableTypes(VARCHAR, INT, list(TIMESTAMP))
-                .withFixedDelay(1000)
+                .withThen(then()
+                    .withVariableTypes(VARCHAR, VARCHAR, INT, set(TIMESTAMP))
+                    .withFixedDelay(1000L))
                 .build();
         primingClient.prime(preparedStatementPrime);
         underTest.connect();
 
-        underTest.storePerson(new Person("Christopher", 29, Collections.emptyList()));
+        underTest.storePerson(new Person("Christopher", "Batey", 29, Collections.emptySet()));
     }
 
     @Test
     public void testLowersConsistency() throws Exception {
         PrimingRequest readtimeoutPrime = PrimingRequest.queryBuilder()
                 .withQuery("select * from person")
-                .withResult(Result.read_request_timeout)
+                .withThen(then().withResult(read_request_timeout))
                 .build();
         primingClient.prime(readtimeoutPrime);
 

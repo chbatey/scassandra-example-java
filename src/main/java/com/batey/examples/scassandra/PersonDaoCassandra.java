@@ -4,12 +4,10 @@ import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.ReadTimeoutException;
 import com.datastax.driver.core.policies.DefaultRetryPolicy;
-import com.datastax.driver.core.policies.DowngradingConsistencyRetryPolicy;
 import com.datastax.driver.core.policies.LoggingRetryPolicy;
 import com.datastax.driver.core.policies.RetryPolicy;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -38,9 +36,9 @@ public class PersonDaoCassandra implements PersonDao {
                 .withRetryPolicy(new LoggingRetryPolicy(new RetryReads()))
                 .withSocketOptions(socketOptions)
                 .build();
-        session = cluster.connect("people");
-        storeStatement = session.prepare("insert into person(name, age, interesting_dates) values (?,?,?)");
-        retrieveStatement = session.prepare("select * from person where name = ?");
+        session = cluster.connect("scassandra");
+        storeStatement = session.prepare("insert into person(first_name, last_name, age, interesting_dates) values (?,?,?,?)");
+        retrieveStatement = session.prepare("select * from person where first_name = ? and last_name = ?");
     }
 
     @Override
@@ -59,21 +57,19 @@ public class PersonDaoCassandra implements PersonDao {
             throw new UnableToRetrievePeopleException();
         }
 
-        List<Person> people = result.all().stream().map(
-                row -> new Person(row.getString("first_name"), row.getInt("age"), Collections.emptyList())
+        return result.all().stream().map(
+                row -> new Person(row.getString("first_name"), row.getString("last_name"), row.getInt("age"), row.getSet("interesting_dates", Date.class))
         ).collect(Collectors.toList());
-
-        return people;
     }
 
     @Override
-    public List<Person> retrievePeopleByName(String firstName) {
-        BoundStatement bind = retrieveStatement.bind(firstName);
+    public List<Person> retrievePeopleByName(String firstName, String lastName) {
+        BoundStatement bind = retrieveStatement.bind(firstName, lastName);
         ResultSet result = session.execute(bind);
 
         List<Person> people = new ArrayList<>();
         for (Row row : result) {
-            people.add(new Person(row.getString("name"), row.getInt("age"), row.getList("interesting_dates", Date.class)));
+            people.add(new Person(row.getString("first_name"), row.getString("last_name"), row.getInt("age"), row.getSet("interesting_dates", Date.class)));
         }
         return people;
     }
@@ -81,7 +77,7 @@ public class PersonDaoCassandra implements PersonDao {
     @Override
     public void storePerson(Person person) {
         try {
-            BoundStatement bind = storeStatement.bind(person.getName(), person.getAge(), person.getInterestingDates());
+            BoundStatement bind = storeStatement.bind(person.getFirstName(), person.getLastName(), person.getAge(), person.getInterestingDates());
             session.execute(bind);
         } catch (NoHostAvailableException e) {
             throw new UnableToSavePersonException();
