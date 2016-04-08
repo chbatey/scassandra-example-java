@@ -27,7 +27,7 @@ import java.util.*;
 import static org.junit.Assert.*;
 import static org.scassandra.cql.PrimitiveType.*;
 import static org.scassandra.cql.SetType.set;
-import static org.scassandra.http.client.PrimingRequest.Result.read_request_timeout;
+import static org.scassandra.http.client.Result.read_request_timeout;
 import static org.scassandra.http.client.PrimingRequest.then;
 import static org.scassandra.http.client.types.ColumnMetadata.column;
 import static org.scassandra.matchers.Matchers.containsQuery;
